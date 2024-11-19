@@ -4,8 +4,6 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.media.MediaPlayer
-import android.os.Handler
-import android.os.Looper
 import android.util.AttributeSet
 import android.view.View
 import android.widget.Toast
@@ -31,8 +29,6 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
     private var isEyeClosed = false
     private var sleepPercentage = 0.0
     private var eyeClosedStartTime: Long = 0
-    private var totalObservationTime: Long = 0
-    private val handler = Handler(Looper.getMainLooper())
     private var isAlarmTriggered = false
 
 
@@ -53,7 +49,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         linePaint.strokeWidth = LANDMARK_STROKE_WIDTH
         linePaint.style = Paint.Style.STROKE
 
-        pointPaint.color = Color.GREEN // Changed to green color
+        pointPaint.color = Color.GREEN
         pointPaint.strokeWidth = LANDMARK_STROKE_WIDTH
         pointPaint.style = Paint.Style.FILL
     }
@@ -67,7 +63,6 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
 
         results?.let { faceLandmarkerResult ->
             for (landmark in faceLandmarkerResult.faceLandmarks()) {
-                // Check eye closure
                 checkEyeClosureAndTriggerAlarm(landmark)
             }
         }
@@ -75,11 +70,9 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
 
         results?.let { faceLandmarkerResult ->
             for (landmark in faceLandmarkerResult.faceLandmarks()) {
-                // Define eye landmark indices
                 val leftEyeIndices = listOf(33, 133, 160, 159, 158, 157, 173)
                 val rightEyeIndices = listOf(362, 263, 387, 386, 385, 384, 398)
 
-                // Draw points for left eye
                 leftEyeIndices.forEach { index ->
                     val eyeLandmark = landmark[index]
                     val (transformedX, transformedY) = transformCoordinates(
@@ -93,7 +86,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                     )
                 }
 
-                // Draw points for right eye
+
                 rightEyeIndices.forEach { index ->
                     val eyeLandmark = landmark[index]
                     val (transformedX, transformedY) = transformCoordinates(
@@ -107,7 +100,6 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                     )
                 }
 
-                // Draw connections for eyes
                 val eyeConnectors = listOf(
                     Pair(33, 133), Pair(133, 160), Pair(160, 159), Pair(159, 158),
                     Pair(158, 157), Pair(157, 173), Pair(173, 33), // Left eye
@@ -139,7 +131,6 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
     }
 
     private fun transformCoordinates(x: Float, y: Float): Pair<Float, Float> {
-        // Adjusted for front camera mirroring effect
         return Pair(1 - y, x)
     }
 
@@ -174,42 +165,37 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                 }
             }
         } else {
-            isEyeClosed = false
-            isAlarmTriggered = false
-            eyeClosedStartTime = 0L
+            if (isEyeClosed) {
+                isEyeClosed = false
+                isAlarmTriggered = false
+                eyeClosedStartTime = 0L
+                setOnAlarmResetListener {}
+            }
         }
     }
 
     private fun triggerAlarm() {
         val mediaPlayer = MediaPlayer.create(context, R.raw.alarm_sound)
+        mediaPlayer.isLooping = true
         mediaPlayer.start()
 
         Toast.makeText(context, "ALERT: Eyes closed for too long!", Toast.LENGTH_SHORT).show()
-    }
 
-    private fun handleEyeClosure(isClosed: Boolean) {
-        val currentTime = System.currentTimeMillis()
-        if (isClosed) {
-            if (!isEyeClosed) {
-                isEyeClosed = true
-                eyeClosedStartTime = currentTime
-            }
-        } else {
-            if (isEyeClosed) {
-                val closedDuration = currentTime - eyeClosedStartTime
-                totalObservationTime += closedDuration
-                isEyeClosed = false
-            }
-        }
-
-        // Update sleep percentage
-        if (isEyeClosed) {
-            val closedDuration = currentTime - eyeClosedStartTime
-            sleepPercentage = ((closedDuration + totalObservationTime) / OBSERVATION_WINDOW) * 100.0
-        } else {
-            sleepPercentage = (totalObservationTime / OBSERVATION_WINDOW) * 100.0
+        setOnAlarmResetListener {
+            mediaPlayer.stop()
+            mediaPlayer.release()
         }
     }
+
+    private fun setOnAlarmResetListener(onReset: () -> Unit) {
+        if (!isEyeClosed) {
+            onReset()
+        }
+    }
+
+
+
+
 
 
     fun setResults(
@@ -237,8 +223,6 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
 
     companion object {
         private const val LANDMARK_STROKE_WIDTH = 8F
-        private const val TAG = "Face Landmarker Overlay"
-        private const val OBSERVATION_WINDOW = 10000L
         private const val EAR_THRESHOLD = 0.2
     }
 }

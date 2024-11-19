@@ -72,7 +72,6 @@ class MainActivity : AppCompatActivity() {
             val previewHeight = binding.cameraview.height
 
             runOnUiThread {
-                // Pass the result to the overlay view for rendering
                 binding.overlayview.setResults(result, previewHeight, previewWidth, RunningMode.LIVE_STREAM)
             }
         } else {
@@ -125,7 +124,7 @@ class MainActivity : AppCompatActivity() {
     private fun processImageProxy(imageProxy: ImageProxy) {
         val bitmap = imageProxy.toBitmap()
         val matrix = Matrix()
-        matrix.preScale(-1f, 1f) // Flip horizontally
+        matrix.preScale(-1f, 1f)
         val flippedBitmap = Bitmap.createBitmap(bitmap, 0, 0, bitmap.width, bitmap.height, matrix, true)
 
         val mpImage = BitmapImageBuilder(flippedBitmap).build()
