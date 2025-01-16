@@ -1,5 +1,7 @@
 package com.example.sleepmonitor
 import android.Manifest
+import android.annotation.SuppressLint
+import android.content.Intent
 import android.content.pm.PackageManager
 import android.graphics.Bitmap
 import android.graphics.Matrix
@@ -29,6 +31,9 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraExecutor: ExecutorService
     private var faceLandmarker: FaceLandmarker? = null
 
+
+
+    @SuppressLint("UnsafeIntentLaunch")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         binding = ActivityMainBinding.inflate(layoutInflater)
@@ -41,6 +46,12 @@ class MainActivity : AppCompatActivity() {
         } else {
             setupFaceLandmarker()
             startCamera()
+        }
+        val button = binding.Settings;
+
+        button.setOnClickListener{
+            intent = Intent(this, SettingsActivity::class.java)
+            startActivity(intent)
         }
     }
 

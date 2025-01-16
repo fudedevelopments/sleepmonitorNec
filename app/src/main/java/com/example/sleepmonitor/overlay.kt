@@ -1,17 +1,27 @@
 package com.google.mediapipe.examples.facelandmarker
+import android.Manifest
 import android.content.Context
+import android.content.pm.PackageManager
 import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.media.MediaPlayer
+import android.os.Handler
+import android.os.Looper
+import android.telephony.SmsManager
 import android.util.AttributeSet
 import android.view.View
 import android.widget.Toast
+import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.example.sleepmonitor.AppDatabase
 import com.example.sleepmonitor.R
 import com.google.mediapipe.tasks.components.containers.NormalizedLandmark
 import com.google.mediapipe.tasks.vision.core.RunningMode
 import com.google.mediapipe.tasks.vision.facelandmarker.FaceLandmarkerResult
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlin.math.max
 import kotlin.math.min
 import kotlin.math.pow
@@ -27,9 +37,12 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
     private var imageWidth: Int = 1
     private var imageHeight: Int = 1
     private var isEyeClosed = false
-    private var sleepPercentage = 0.0
     private var eyeClosedStartTime: Long = 0
     private var isAlarmTriggered = false
+    private var mediaPlayer: MediaPlayer? = null
+    private var lastSmsSentTime: Long = 0
+
+
 
 
     init {
@@ -153,7 +166,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         println("left Ear : $leftEar rightEar : $rightEar")
         println(isEyeClosed)
         println(isAlarmTriggered)
-        if (leftEar < EAR_THRESHOLD) {
+        if (leftEar < EAR_THRESHOLD || rightEar < EAR_THRESHOLD) {
             if (!isEyeClosed) {
                 isEyeClosed = true
                 eyeClosedStartTime = currentTime
@@ -163,27 +176,40 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                     triggerAlarm()
                     isAlarmTriggered = true
                 }
+                if (closedDuration > 20000) {
+                    if (currentTime - lastSmsSentTime > 30000) { // 30 seconds cooldown
+                        sendSmsFromDatabase()
+                        lastSmsSentTime = currentTime // Update last SMS sent time
+                    }
+                }
             }
         } else {
             if (isEyeClosed) {
                 isEyeClosed = false
                 isAlarmTriggered = false
                 eyeClosedStartTime = 0L
-                setOnAlarmResetListener {}
+                setOnAlarmResetListener {
+                    mediaPlayer?.stop()
+                    mediaPlayer?.release()
+                    mediaPlayer = null
+                }
             }
         }
     }
 
     private fun triggerAlarm() {
-        val mediaPlayer = MediaPlayer.create(context, R.raw.alarm_sound)
-        mediaPlayer.isLooping = true
-        mediaPlayer.start()
+        if (mediaPlayer == null) {
+            mediaPlayer = MediaPlayer.create(context, R.raw.alarm_sound).apply {
+                isLooping = true // Ensure looping is enabled
+                start() // Start the alarm sound
+            }
+            Toast.makeText(context, "ALERT: Eyes closed for too long!", Toast.LENGTH_SHORT).show()
 
-        Toast.makeText(context, "ALERT: Eyes closed for too long!", Toast.LENGTH_SHORT).show()
-
-        setOnAlarmResetListener {
-            mediaPlayer.stop()
-            mediaPlayer.release()
+            setOnAlarmResetListener {
+                mediaPlayer?.stop()
+                mediaPlayer?.release()
+                mediaPlayer = null // Reset mediaPlayer to null after stopping
+            }
         }
     }
 
@@ -194,8 +220,45 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
     }
 
 
+    fun sendSmsFromDatabase() {
+        val database = AppDatabase.getDatabase(context!!)
+        val userDao = database.settingsDao()
+
+        CoroutineScope(Dispatchers.IO).launch {
+            val mobileNumber = userDao.getSettings()?.mobileNumber
+            if (mobileNumber.isNullOrEmpty()) {
+                CoroutineScope(Dispatchers.Main).launch {
+                    Toast.makeText(context, "No mobile number found in the database!", Toast.LENGTH_SHORT).show()
+                }
+            } else {
+                println(mobileNumber)
+                sendSms(mobileNumber, "ALERT: Driver's eyes have been closed for over 20 seconds!")
+            }
+        }
+    }
 
 
+
+    fun sendSms(phoneNumber: String, message: String) {
+        if (ActivityCompat.checkSelfPermission(
+                context!!,
+                Manifest.permission.SEND_SMS
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            Toast.makeText(context, "Permission to send SMS is not granted!", Toast.LENGTH_SHORT).show()
+            return
+        }
+
+        try {
+            val smsManager = SmsManager.getDefault()
+            smsManager.sendTextMessage(phoneNumber, null, message, null, null)
+            Handler(Looper.getMainLooper()).post {
+                Toast.makeText(context, "SMS sent: $message", Toast.LENGTH_SHORT).show()
+            }
+        } catch (e: Exception) {
+            Toast.makeText(context, "Failed to send SMS: ${e.message}", Toast.LENGTH_SHORT).show()
+        }
+    }
 
 
     fun setResults(
