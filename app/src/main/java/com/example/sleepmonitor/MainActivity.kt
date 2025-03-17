@@ -31,8 +31,6 @@ class MainActivity : AppCompatActivity() {
     private lateinit var cameraExecutor: ExecutorService
     private var faceLandmarker: FaceLandmarker? = null
 
-
-
     @SuppressLint("UnsafeIntentLaunch")
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -42,14 +40,14 @@ class MainActivity : AppCompatActivity() {
         cameraExecutor = Executors.newSingleThreadExecutor()
 
         if (!hasRequiredPermissions()) {
-            ActivityCompat.requestPermissions(this, CAMERAPERMISSION, 0)
+            ActivityCompat.requestPermissions(this, REQUIRED_PERMISSIONS, REQUEST_CODE_PERMISSIONS)
         } else {
             setupFaceLandmarker()
             startCamera()
         }
-        val button = binding.Settings;
 
-        button.setOnClickListener{
+        val button = binding.Settings
+        button.setOnClickListener {
             intent = Intent(this, SettingsActivity::class.java)
             startActivity(intent)
         }
@@ -74,10 +72,7 @@ class MainActivity : AppCompatActivity() {
         faceLandmarker = FaceLandmarker.createFromOptions(this, options)
     }
 
-    private fun returnLivestreamResult(
-        result: FaceLandmarkerResult,
-        input: MPImage
-    ) {
+    private fun returnLivestreamResult(result: FaceLandmarkerResult, input: MPImage) {
         if (result.faceLandmarks().isNotEmpty()) {
             val previewWidth = binding.cameraview.width
             val previewHeight = binding.cameraview.height
@@ -91,7 +86,6 @@ class MainActivity : AppCompatActivity() {
             }
         }
     }
-
 
     private fun returnLivestreamError(error: RuntimeException) {
         Log.e("FaceLandmarker", "Error during live stream processing: ${error.message}", error)
@@ -123,9 +117,7 @@ class MainActivity : AppCompatActivity() {
 
             try {
                 cameraProvider.unbindAll()
-                cameraProvider.bindToLifecycle(
-                    this, cameraSelector, preview, imageAnalyzer
-                )
+                cameraProvider.bindToLifecycle(this, cameraSelector, preview, imageAnalyzer)
             } catch (e: Exception) {
                 Log.e("CameraX", "Use case binding failed", e)
             }
@@ -144,9 +136,8 @@ class MainActivity : AppCompatActivity() {
         imageProxy.close()
     }
 
-
     private fun hasRequiredPermissions(): Boolean {
-        return CAMERAPERMISSION.all {
+        return REQUIRED_PERMISSIONS.all {
             ActivityCompat.checkSelfPermission(this, it) == PackageManager.PERMISSION_GRANTED
         }
     }
@@ -157,20 +148,26 @@ class MainActivity : AppCompatActivity() {
         grantResults: IntArray
     ) {
         super.onRequestPermissionsResult(requestCode, permissions, grantResults)
-        if (requestCode == 0 && grantResults.isNotEmpty() &&
-            grantResults[0] == PackageManager.PERMISSION_GRANTED
-        ) {
-            setupFaceLandmarker()
-            startCamera()
-        } else {
-            Toast.makeText(this, "Camera permission is required", Toast.LENGTH_SHORT).show()
+        if (requestCode == REQUEST_CODE_PERMISSIONS) {
+            if (hasRequiredPermissions()) {
+                setupFaceLandmarker()
+                startCamera()
+            } else {
+                Toast.makeText(
+                    this,
+                    "Permissions not granted. Camera and SMS features require these permissions.",
+                    Toast.LENGTH_LONG
+                ).show()
+            }
         }
     }
+
     override fun onResume() {
         super.onResume()
-        startCamera()
+        if (hasRequiredPermissions()) {
+            startCamera()
+        }
     }
-
 
     override fun onDestroy() {
         super.onDestroy()
@@ -179,8 +176,10 @@ class MainActivity : AppCompatActivity() {
     }
 
     companion object {
-        private val CAMERAPERMISSION = arrayOf(
-            Manifest.permission.CAMERA
+        private val REQUIRED_PERMISSIONS = arrayOf(
+            Manifest.permission.CAMERA,
+            Manifest.permission.SEND_SMS // Added SMS permission
         )
+        private const val REQUEST_CODE_PERMISSIONS = 0
     }
 }

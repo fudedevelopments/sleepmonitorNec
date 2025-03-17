@@ -16,4 +16,3 @@ interface SettingsDao {
     @Update
     suspend fun updateSettings(settings: Settings)
 }
-

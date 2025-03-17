@@ -1,40 +1,98 @@
-<LinearLayout
+<ScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:orientation="vertical"
-    android:padding="16dp">
+    android:fillViewport="true">
 
-    <TextView
-        android:id="@+id/thresholdValueText"
-        android:layout_width="wrap_content"
-        android:layout_height="wrap_content"
-        android:text="Threshold: 0.20"
-        android:textSize="16sp" />
-
-    <SeekBar
-        android:id="@+id/thresholdSeekBar"
+    <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:max="100" />
+        android:orientation="vertical"
+        android:padding="16dp"
+        android:background="@android:color/white">
 
-    <EditText
-        android:id="@+id/mobileNumberInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Enter Mobile Number"
-        android:inputType="phone" />
+        <!-- Header -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Sleep Monitor Settings"
+            android:textSize="24sp"
+            android:textStyle="bold"
+            android:textColor="@android:color/black"
+            android:paddingBottom="16dp" />
 
-    <EditText
-        android:id="@+id/alarmDurationInput"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:hint="Enter Alarm Duration (seconds)"
-        android:inputType="number" />
+        <!-- Threshold Input -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Threshold (seconds)"
+            android:textSize="16sp"
+            android:textColor="@android:color/darker_gray"
+            android:paddingBottom="4dp" />
 
-    <Button
-        android:id="@+id/saveButton"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:text="Save Settings" />
-</LinearLayout>
+        <EditText
+            android:id="@+id/thresholdInput"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Enter threshold in seconds"
+            android:inputType="number"
+            android:background="@drawable/edittext_background"
+            android:padding="12dp"
+            android:textSize="16sp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Mobile Number Input -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Mobile Number"
+            android:textSize="16sp"
+            android:textColor="@android:color/darker_gray"
+            android:paddingBottom="4dp" />
+
+        <EditText
+            android:id="@+id/mobileNumberInput"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Enter mobile number"
+            android:inputType="phone"
+            android:background="@drawable/edittext_background"
+            android:padding="12dp"
+            android:textSize="16sp"
+            android:layout_marginBottom="16dp" />
+
+        <!-- Alarm Duration Input -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Alarm Duration (seconds)"
+            android:textSize="16sp"
+            android:textColor="@android:color/darker_gray"
+            android:paddingBottom="4dp" />
+
+        <EditText
+            android:id="@+id/alarmDurationInput"
+            android:layout_width="match_parent"
+            android:layout_height="48dp"
+            android:hint="Enter alarm duration in seconds"
+            android:inputType="number"
+            android:background="@drawable/edittext_background"
+            android:padding="12dp"
+            android:textSize="16sp"
+            android:layout_marginBottom="24dp" />
+
+        <!-- Save Button -->
+        <Button
+            android:id="@+id/saveButton"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Save Settings"
+            android:textSize="16sp"
+            android:textAllCaps="false"
+            android:backgroundTint="#FF6200EE"
+            android:textColor="@android:color/white"
+            android:padding="12dp"
+            android:layout_gravity="center" />
+
+    </LinearLayout>
+</ScrollView>

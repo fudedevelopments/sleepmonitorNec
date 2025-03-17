@@ -27,8 +27,7 @@ import kotlin.math.min
 import kotlin.math.pow
 import kotlin.math.sqrt
 
-class OverlayView(context: Context?, attrs: AttributeSet?) :
-    View(context, attrs) {
+class OverlayView(context: Context?, attrs: AttributeSet?) : View(context, attrs) {
 
     private var results: FaceLandmarkerResult? = null
     private var linePaint = Paint()
@@ -41,12 +40,23 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
     private var isAlarmTriggered = false
     private var mediaPlayer: MediaPlayer? = null
     private var lastSmsSentTime: Long = 0
-
-
-
+    private var thresholdDuration: Int = 10 // Default threshold in seconds
+    private var smsAlarmDuration: Int = 20 // Default SMS duration in seconds
 
     init {
         initPaints()
+        loadSettingsFromDatabase() // Load initial settings
+    }
+
+    private fun loadSettingsFromDatabase() {
+        val database = AppDatabase.getDatabase(context!!)
+        CoroutineScope(Dispatchers.IO).launch {
+            val settings = database.settingsDao().getSettings()
+            settings?.let {
+                thresholdDuration = it.threshold // Use threshold from DB (in seconds)
+                smsAlarmDuration = it.alarmDuration // Use alarmDuration from DB (in seconds)
+            }
+        }
     }
 
     fun clear() {
@@ -80,7 +90,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
             }
         }
 
-
+        // Rest of your drawing code remains the same
         results?.let { faceLandmarkerResult ->
             for (landmark in faceLandmarkerResult.faceLandmarks()) {
                 val leftEyeIndices = listOf(33, 133, 160, 159, 158, 157, 173)
@@ -88,10 +98,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
 
                 leftEyeIndices.forEach { index ->
                     val eyeLandmark = landmark[index]
-                    val (transformedX, transformedY) = transformCoordinates(
-                        eyeLandmark.x(),
-                        eyeLandmark.y()
-                    )
+                    val (transformedX, transformedY) = transformCoordinates(eyeLandmark.x(), eyeLandmark.y())
                     canvas.drawPoint(
                         transformedX * imageWidth * scaleFactor,
                         transformedY * imageHeight * scaleFactor,
@@ -99,13 +106,9 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                     )
                 }
 
-
                 rightEyeIndices.forEach { index ->
                     val eyeLandmark = landmark[index]
-                    val (transformedX, transformedY) = transformCoordinates(
-                        eyeLandmark.x(),
-                        eyeLandmark.y()
-                    )
+                    val (transformedX, transformedY) = transformCoordinates(eyeLandmark.x(), eyeLandmark.y())
                     canvas.drawPoint(
                         transformedX * imageWidth * scaleFactor,
                         transformedY * imageHeight * scaleFactor,
@@ -123,14 +126,8 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                 eyeConnectors.forEach { connector ->
                     val startLandmark = landmark[connector.first]
                     val endLandmark = landmark[connector.second]
-                    val (startX, startY) = transformCoordinates(
-                        startLandmark.x(),
-                        startLandmark.y()
-                    )
-                    val (endX, endY) = transformCoordinates(
-                        endLandmark.x(),
-                        endLandmark.y()
-                    )
+                    val (startX, startY) = transformCoordinates(startLandmark.x(), startLandmark.y())
+                    val (endX, endY) = transformCoordinates(endLandmark.x(), endLandmark.y())
                     canvas.drawLine(
                         startX * imageWidth * scaleFactor,
                         startY * imageHeight * scaleFactor,
@@ -154,7 +151,7 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         return (vertical1 + vertical2) / (2.0f * horizontal)
     }
 
-    private fun distance(l1:NormalizedLandmark, l2: NormalizedLandmark): Float {
+    private fun distance(l1: NormalizedLandmark, l2: NormalizedLandmark): Float {
         return sqrt((l1.x() - l2.x()).pow(2) + (l1.y() - l2.y()).pow(2))
     }
 
@@ -172,14 +169,17 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                 eyeClosedStartTime = currentTime
             } else {
                 val closedDuration = currentTime - eyeClosedStartTime
-                if (closedDuration > 10000 && !isAlarmTriggered) {
+                val thresholdMillis = thresholdDuration * 1000L // Convert seconds to milliseconds
+                val smsAlarmMillis = smsAlarmDuration * 1000L // Convert seconds to milliseconds
+
+                if (closedDuration > thresholdMillis && !isAlarmTriggered) {
                     triggerAlarm()
                     isAlarmTriggered = true
                 }
-                if (closedDuration > 20000) {
+                if (closedDuration > smsAlarmMillis) {
                     if (currentTime - lastSmsSentTime > 30000) { // 30 seconds cooldown
                         sendSmsFromDatabase()
-                        lastSmsSentTime = currentTime // Update last SMS sent time
+                        lastSmsSentTime = currentTime
                     }
                 }
             }
@@ -200,15 +200,15 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
     private fun triggerAlarm() {
         if (mediaPlayer == null) {
             mediaPlayer = MediaPlayer.create(context, R.raw.alarm_sound).apply {
-                isLooping = true // Ensure looping is enabled
-                start() // Start the alarm sound
+                isLooping = true
+                start()
             }
             Toast.makeText(context, "ALERT: Eyes closed for too long!", Toast.LENGTH_SHORT).show()
 
             setOnAlarmResetListener {
                 mediaPlayer?.stop()
                 mediaPlayer?.release()
-                mediaPlayer = null // Reset mediaPlayer to null after stopping
+                mediaPlayer = null
             }
         }
     }
@@ -218,7 +218,6 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
             onReset()
         }
     }
-
 
     fun sendSmsFromDatabase() {
         val database = AppDatabase.getDatabase(context!!)
@@ -232,12 +231,10 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
                 }
             } else {
                 println(mobileNumber)
-                sendSms(mobileNumber, "ALERT: Driver's eyes have been closed for over 20 seconds!")
+                sendSms(mobileNumber, "ALERT: Driver's eyes have been closed for over $smsAlarmDuration seconds!")
             }
         }
     }
-
-
 
     fun sendSms(phoneNumber: String, message: String) {
         if (ActivityCompat.checkSelfPermission(
@@ -260,7 +257,6 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         }
     }
 
-
     fun setResults(
         faceLandmarkerResults: FaceLandmarkerResult,
         imageHeight: Int,
@@ -268,24 +264,19 @@ class OverlayView(context: Context?, attrs: AttributeSet?) :
         runningMode: RunningMode = RunningMode.IMAGE
     ) {
         results = faceLandmarkerResults
-
         this.imageHeight = imageHeight
         this.imageWidth = imageWidth
 
         scaleFactor = when (runningMode) {
             RunningMode.IMAGE,
-            RunningMode.VIDEO -> {
-                min(width * 1f / imageWidth, height * 1f / imageHeight)
-            }
-            RunningMode.LIVE_STREAM -> {
-                max(width * 1f / imageWidth, height * 1f / imageHeight)
-            }
+            RunningMode.VIDEO -> min(width * 1f / imageWidth, height * 1f / imageHeight)
+            RunningMode.LIVE_STREAM -> max(width * 1f / imageWidth, height * 1f / imageHeight)
         }
         invalidate()
     }
 
     companion object {
         private const val LANDMARK_STROKE_WIDTH = 8F
-        private const val EAR_THRESHOLD = 0.2
+        private const val EAR_THRESHOLD = 0.2f
     }
 }
